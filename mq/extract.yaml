@@ -1,5 +1,5 @@
 - name: Extract file on remote server
-  hosts: webservers
+  hosts: mq-servers
   remote_user: opc
   tasks:
     - name: Extract file

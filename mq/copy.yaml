@@ -1,5 +1,5 @@
 - name: Copy file to remote server
-  hosts: webservers
+  hosts: mq-servers
   remote_user: opc
   tasks:
     - name: Copy file
