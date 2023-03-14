@@ -1,0 +1,85 @@
+- name: Example playbook
+  hosts: all
+  remote_user: opc
+  become: true
+  become_user: mqm
+
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/opt/mqm/bin"
+    BASH_ENV: "{{ ansible_env.HOME }}/.bash_profile"
+
+  tasks:
+    - name: Display PATH environment variable
+      shell: echo $PATH
+      register: output
+
+    - name: Display output
+      debug:
+        var: output.stdout_lines
+    - name: Execute dspmqver command
+      command: dspmqver
+      register: mqver_output
+    - name: Display dspmqver output
+      become: true
+      debug:
+        var: mqver_output.stdout_lines
+    - name: Create and start queue managers
+      shell: |
+        crtmqm QM1
+        strmqm QM1
+        crtmqm QM2
+        strmqm QM2
+        crtmqm QM3
+        strmqm QM3
+      with_items: "{{ groups['mq-servers'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+    - name: Define listeners for the queue managers
+      shell: |
+        echo "DEFINE LISTENER(LSNR.QM1) TRPTYPE(TCP) PORT(1111) CONTROL(QMGR)" | runmqsc QM1
+        echo "START LISTENER(LSNR.QM1)" | runmqsc QM1
+        echo "DEFINE LISTENER(LSNR.QM2) TRPTYPE(TCP) PORT(2222) CONTROL(QMGR)" | runmqsc QM2
+        echo "START LISTENER(LSNR.QM2)" | runmqsc QM2
+        echo "DEFINE LISTENER(LSNR.QM3) TRPTYPE(TCP) PORT(3333) CONTROL(QMGR)" | runmqsc QM3
+        echo "START LISTENER(LSNR.QM3)" | runmqsc QM3
+      with_items: "{{ groups['mq-servers'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+    - name: Create CLUSRCVR channels
+      shell: |
+        echo "DEFINE CHANNEL(TO.QM1) CHLTYPE(CLUSRCVR) CONNAME('LOCALHOST(1111)') CLUSTER(FULL)" | runmqsc QM1
+        echo "DEFINE CHANNEL(TO.QM2) CHLTYPE(CLUSRCVR) CONNAME('LOCALHOST(2222)') CLUSTER(FULL)" | runmqsc QM2
+        echo "DEFINE CHANNEL(TO.QM3) CHLTYPE(CLUSRCVR) CONNAME('LOCALHOST(3333)') CLUSTER(FULL)" | runmqsc QM3
+      with_items: "{{ groups['mq-servers'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+    - name: Create CLUSSDR channels
+      shell: |
+        echo "DEFINE CHANNEL(TO.QM2) CHLTYPE(CLUSSDR) CONNAME('LOCALHOST(2222)') CLUSTER(FULL)" | runmqsc QM1
+        echo "DEFINE CHANNEL(TO.QM1) CHLTYPE(CLUSSDR) CONNAME('LOCALHOST(1111)') CLUSTER(FULL)" | runmqsc QM2
+        echo "DEFINE CHANNEL(TO.QM1) CHLTYPE(CLUSSDR) CONNAME('LOCALHOST(1111)') CLUSTER(FULL)" | runmqsc QM3
+      with_items: "{{ groups['mq-servers'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+    - name: Making queue managers as FULL repositories
+      shell: |
+        echo "ALTER QMGR REPOS(FULL)" | runmqsc QM1
+        echo "ALTER QMGR REPOS(FULL)" | runmqsc QM2
+        echo "ALTER QMGR REPOS(FULL)" | runmqsc QM2
+      with_items: "{{ groups['mq-servers'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+    - name: Display queue managers in a cluster
+      shell: echo "DISPLAY CLUSQMGR(*)" | runmqsc QM1
+      register: clusqmgr_output
+    - name: Display queue managers in a cluster output
+      become: true
+      debug:
+        var: clusqmgr_output.stdout_lines
+    - name: Deploy queues
+      shell: |
+        echo "DEFINE QLOCAL(QM1.LQ) CLUSTER(FULL)" | runmqsc QM1
+        echo "DEFINE QLOCAL(QM2.LQ) CLUSTER(FULL)" | runmqsc QM2
+        echo "DEFINE QLOCAL(QM3.LQ) CLUSTER(FULL)" | runmqsc QM3
+    - name: Display queues in a cluster
+      shell: echo "DISPLAY QCLUSTER(*)" | runmqsc QM1
+      register: qcluster_output
+    - name: Display queue managers in a cluster output
+      become: true
+      debug:
+        var: qcluster_output.stdout_lines

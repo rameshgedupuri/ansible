@@ -1,0 +1,39 @@
+- name: Example playbook
+  hosts: all
+  remote_user: opc
+  become: true
+  become_user: mqm
+
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/opt/mqm/bin"
+    BASH_ENV: "{{ ansible_env.HOME }}/.bash_profile"
+
+  tasks:
+    - name: Display PATH environment variable
+      shell: echo $PATH
+      register: output
+
+    - name: Display output
+      debug:
+        var: output.stdout_lines
+    - name: Execute dspmqver command
+      command: dspmqver
+      register: mqver_output
+    - name: Display dspmqver output
+      become: true
+      debug:
+        var: mqver_output.stdout_lines
+    - name: stop the queue managers
+      shell: |
+        endmqm QM1
+        endmqm QM2
+        endmqm QM3
+      with_items: "{{ groups['mq-servers'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+    - name: delete the queue managers
+      shell: |
+        dltmqm QM1
+        dltmqm QM2
+        dltmqm QM3
+      with_items: "{{ groups['mq-servers'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]

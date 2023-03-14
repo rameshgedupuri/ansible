@@ -1,0 +1,6 @@
+- name: Ping hosts
+  hosts: webservers
+  remote_user: opc
+  tasks:
+    - name: Ping host
+      ping:
