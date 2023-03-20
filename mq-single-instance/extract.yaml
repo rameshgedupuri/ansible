@@ -1,0 +1,13 @@
+- name: Extract file on remote server
+  hosts: mq-servers
+  remote_user: opc
+  tasks:
+    - name: Extract file
+      unarchive:
+        src: ~/9.3.0.0-IBM-MQTRIAL-LinuxX64.tar.gz
+        dest: /home/opc/mq
+        remote_src: yes
+        owner: root
+        group: root
+        mode: '0755'
+        extra_opts: "--exclude='*.txt'"

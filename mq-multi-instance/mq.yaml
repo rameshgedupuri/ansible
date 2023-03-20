@@ -1,0 +1,74 @@
+- name: Example playbook
+  hosts: all
+  remote_user: opc
+  become: true
+  become_user: mqm
+
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/opt/mqm/bin"
+    BASH_ENV: "{{ ansible_env.HOME }}/.bash_profile"
+
+  tasks:
+    - name: Display PATH environment variable
+      shell: echo $PATH
+      register: output
+
+    - name: Display output
+      debug:
+        var: output.stdout_lines
+    - name: Execute dspmqver command
+      command: dspmqver
+      register: mqver_output
+    - name: Display dspmqver output
+      become: true
+      debug:
+        var: mqver_output.stdout_lines
+    - name: Create and configure full repository queue manager for instance-1
+      shell: |
+        crtmqm "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        strmqm "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE LISTENER(LSNR."{{ hostvars[inventory_hostname]['mq_qmgr'] }}") TRPTYPE(TCP) PORT("{{ hostvars[inventory_hostname]['mq_port'] }}") CONTROL(QMGR)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "START LISTENER(LSNR."{{ hostvars[inventory_hostname]['mq_qmgr'] }}")" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE CHANNEL(TO."{{ hostvars[inventory_hostname]['mq_qmgr'] }}") CHLTYPE(CLUSRCVR) CONNAME('"{{ hostvars[inventory_hostname]['ansible_host'] }}"("{{ hostvars[inventory_hostname]['mq_port'] }}")') CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE CHANNEL(TO.{{ hostvars["mq2"]['mq_qmgr'] }}) CHLTYPE(CLUSSDR) TRPTYPE(TCP) CONNAME('{{ hostvars["mq2"]["ansible_host"] }}(2222)') CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "ALTER QMGR REPOS(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE QLOCAL(LQ1) CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+    - name: Create and configure full repository queue manager for instance-2
+      shell: |
+        crtmqm "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        strmqm "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE LISTENER(LSNR."{{ hostvars[inventory_hostname]['mq_qmgr'] }}") TRPTYPE(TCP) PORT("{{ hostvars[inventory_hostname]['mq_port'] }}") CONTROL(QMGR)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "START LISTENER(LSNR."{{ hostvars[inventory_hostname]['mq_qmgr'] }}")" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE CHANNEL(TO."{{ hostvars[inventory_hostname]['mq_qmgr'] }}") CHLTYPE(CLUSRCVR) CONNAME('"{{ hostvars[inventory_hostname]['ansible_host'] }}"("{{ hostvars[inventory_hostname]['mq_port'] }}")') CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE CHANNEL(TO.{{ hostvars["mq1"]['mq_qmgr'] }}) CHLTYPE(CLUSSDR) TRPTYPE(TCP) CONNAME('{{ hostvars["mq1"]["ansible_host"] }}(1111)') CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "ALTER QMGR REPOS(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE QLOCAL(LQ2) CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+      when: inventory_hostname == groups['mq-servers'][1]
+    - name: Create and configure full repository queue manager for instance-3
+      shell: |
+        crtmqm "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        strmqm "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE LISTENER(LSNR."{{ hostvars[inventory_hostname]['mq_qmgr'] }}") TRPTYPE(TCP) PORT("{{ hostvars[inventory_hostname]['mq_port'] }}") CONTROL(QMGR)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "START LISTENER(LSNR."{{ hostvars[inventory_hostname]['mq_qmgr'] }}")" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE CHANNEL(TO."{{ hostvars[inventory_hostname]['mq_qmgr'] }}") CHLTYPE(CLUSRCVR) CONNAME('"{{ hostvars[inventory_hostname]['ansible_host'] }}"("{{ hostvars[inventory_hostname]['mq_port'] }}")') CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE CHANNEL(TO.{{ hostvars["mq1"]['mq_qmgr'] }}) CHLTYPE(CLUSSDR) TRPTYPE(TCP) CONNAME('{{ hostvars["mq1"]["ansible_host"] }}(1111)') CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "ALTER QMGR REPOS(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+        echo "DEFINE QLOCAL(LQ3) CLUSTER(FULL)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+      when: inventory_hostname == groups['mq-servers'][2]
+    - name: Display queue managers in a cluster
+      shell: echo "DISPLAY CLUSQMGR(*)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+      register: clusqmgr_output
+    - name: Display queue managers in a cluster output
+      become: true
+      debug:
+        var: clusqmgr_output.stdout_lines
+    - name: Display queues in a cluster
+      shell: echo "DISPLAY QCLUSTER(*)" | runmqsc "{{ hostvars[inventory_hostname]['mq_qmgr'] }}"
+      when: inventory_hostname == groups['mq-servers'][0]
+      register: qcluster_output
+    - name: Display queue managers in a cluster output
+      become: true
+      debug:
+        var: qcluster_output.stdout_lines

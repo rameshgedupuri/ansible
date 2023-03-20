@@ -1,0 +1,6 @@
+- name: Ping hosts
+  hosts: mq-servers
+  remote_user: opc
+  tasks:
+    - name: Ping host
+      ping:

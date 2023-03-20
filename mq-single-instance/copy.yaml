@@ -1,0 +1,11 @@
+- name: Copy file to remote server
+  hosts: mq-servers
+  remote_user: opc
+  tasks:
+    - name: Copy file
+      copy:
+        src: ~/Downloads/9.3.0.0-IBM-MQTRIAL-LinuxX64.tar.gz
+        dest: /home/opc
+        owner: opc
+        group: opc
+        mode: '0755'
